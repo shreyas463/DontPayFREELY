@@ -33,6 +33,8 @@ const el = {
 const state = {
   attachScreenshot: false,
   listening: false,
+  forceClickThrough: false,
+  systemAudio: false,
   activeAssistantEl: null,
   activeBuffer: '',
   status: null,
@@ -221,8 +223,48 @@ cluely.on('ui:focus-input', () => {
   el.input.focus();
 });
 
+// ---------------------------------------------------------------------------
+// Hover-based click-through
+//
+// By default the overlay only captures the mouse where there's actual UI
+// (controls, message text). Empty areas pass clicks straight through to the app
+// behind it. The manual toggle (Cmd+Shift+M) forces full pass-through — a true
+// "ghost" mode where even the controls are click-through.
+// ---------------------------------------------------------------------------
+const INTERACTIVE_SEL =
+  '#drag-bar, .modes, .composer, .transcript-strip, .drawer, .perm-banner, .toast, ' +
+  '.bubble, .role, .error-msg, .empty, .mode-btn, .icon-btn, .tool-btn, .send-btn, .copy-btn';
+let ignoringMouse = null;
+
+function requestIgnore(v) {
+  if (v === ignoringMouse) return;
+  ignoringMouse = v;
+  cluely.setIgnoreMouse(v);
+}
+
+function updateMouseIgnore(x, y) {
+  if (state.forceClickThrough) {
+    requestIgnore(true); // ghost mode: nothing captures the mouse
+    return;
+  }
+  const target = document.elementFromPoint(x, y);
+  const overUI = !!(target && target.closest && target.closest(INTERACTIVE_SEL));
+  requestIgnore(!overUI);
+}
+
+document.addEventListener('mousemove', (e) => updateMouseIgnore(e.clientX, e.clientY));
+// If the pointer leaves the window entirely, go back to pass-through.
+document.addEventListener('mouseleave', () => requestIgnore(true));
+
 cluely.on('ui:click-through', (p) => {
-  document.body.style.opacity = p.clickThrough ? '0.75' : '1';
+  state.forceClickThrough = !!p.clickThrough;
+  document.body.style.opacity = state.forceClickThrough ? '0.75' : '1';
+  // Re-evaluate immediately so the toggle takes effect without waiting for a move.
+  if (state.forceClickThrough) requestIgnore(true);
+  else {
+    ignoringMouse = null; // force a re-send on next move
+    requestIgnore(false);
+  }
 });
 
 // A mode was triggered (button or hotkey): show its user bubble, if any.

@@ -298,6 +298,14 @@ function registerIpc() {
     return { clickThrough };
   });
 
+  // Fine-grained pointer pass-through driven by the renderer's hover tracking.
+  // `forward: true` keeps mousemove events flowing so the renderer can tell when
+  // the cursor re-enters an interactive region and take the mouse back.
+  ipcMain.handle('window:setIgnoreMouse', (_e, { value }) => {
+    if (win && !win.isDestroyed()) win.setIgnoreMouseEvents(Boolean(value), { forward: true });
+    return { ok: true };
+  });
+
   ipcMain.handle('shell:openConfig', () => {
     shell.openPath(USER_CONFIG_PATH).catch(() => {});
     return { ok: true };

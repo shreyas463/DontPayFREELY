@@ -18,6 +18,7 @@ const api = {
   resetContext: () => ipcRenderer.invoke('context:reset'),
   setSize: (width, height) => ipcRenderer.invoke('window:setSize', { width, height }),
   setClickThrough: (value) => ipcRenderer.invoke('window:setClickThrough', { value }),
+  setIgnoreMouse: (value) => ipcRenderer.invoke('window:setIgnoreMouse', { value }),
   openConfig: () => ipcRenderer.invoke('shell:openConfig'),
   quit: () => ipcRenderer.invoke('app:quit'),
 
