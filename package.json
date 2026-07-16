@@ -1,0 +1,63 @@
+{
+  "name": "dontpayfreely",
+  "productName": "FreelyCluely",
+  "version": "0.1.0",
+  "description": "An open-source, stealth AI overlay assistant — a working Cluely replica.",
+  "main": "src/main/main.js",
+  "author": "shreyas463",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "ELECTRON_ENABLE_LOGGING=1 electron .",
+    "icons": "node scripts/gen-icons.js",
+    "whisper:setup": "node scripts/setup-whisper.js",
+    "dist": "npm run icons && electron-builder",
+    "dist:dir": "npm run icons && electron-builder --dir",
+    "rebuild": "electron-rebuild"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "optionalDependencies": {
+    "nodejs-whisper": "^0.2.9"
+  },
+  "build": {
+    "appId": "com.freelycluely.app",
+    "productName": "FreelyCluely",
+    "copyright": "Copyright © 2026 shreyas463",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "src/**/*",
+      "config/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/icon.png",
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] },
+        { "target": "zip", "arch": ["arm64", "x64"] }
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "LSUIElement": true,
+        "NSMicrophoneUsageDescription": "FreelyCluely transcribes audio locally to provide real-time answers.",
+        "NSScreenCaptureUsageDescription": "FreelyCluely captures your screen to answer questions about what you see."
+      }
+    },
+    "dmg": {
+      "title": "FreelyCluely ${version}"
+    }
+  }
+}
