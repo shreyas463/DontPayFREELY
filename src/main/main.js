@@ -7,7 +7,7 @@ try {
   /* dotenv is a hard dep, but never crash on it */
 }
 
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, session, desktopCapturer } = require('electron');
 const path = require('path');
 
 const { loadConfig, saveUserConfig, reload, USER_CONFIG_PATH } = require('./config');
@@ -128,17 +128,34 @@ function quitApp() {
 // ---------------------------------------------------------------------------
 
 let lastScreenshot = null;
-let transcriptBuffer = '';
 
-async function runCompletion({ imageDataUrl, prompt }) {
+// Dual-channel transcript: 'you' = your mic, 'them' = system/meeting audio.
+// Kept as labeled turns so the model knows who said what.
+let transcript = []; // { channel: 'you'|'them', text, ts }
+const MAX_TURNS = 200;
+
+function formatTranscript(limit) {
+  const turns = limit ? transcript.slice(-limit) : transcript;
+  return turns.map((t) => (t.channel === 'them' ? 'Them: ' : 'You: ') + t.text).join('\n');
+}
+
+function addTranscriptTurn(channel, text) {
+  const turn = { channel, text, ts: Date.now() };
+  transcript.push(turn);
+  if (transcript.length > MAX_TURNS) transcript = transcript.slice(-MAX_TURNS);
+  send('transcript:update', { channel, text, full: formatTranscript(0) });
+}
+
+async function runCompletion({ imageDataUrl, prompt, system }) {
   if (imageDataUrl) lastScreenshot = imageDataUrl;
   const requestId = `req-${Date.now()}`;
   send('assistant:start', { requestId });
 
   try {
     const full = await ai.complete(config, {
+      system: system || undefined,
       prompt,
-      transcript: transcriptBuffer,
+      transcript: formatTranscript(16),
       imageDataUrl: imageDataUrl || null,
       onToken: (chunk) => send('assistant:token', { requestId, chunk }),
     });
@@ -200,18 +217,17 @@ function registerIpc() {
     return { ok: true };
   });
 
-  // Renderer captured a WAV audio chunk (mic/system) for transcription.
-  ipcMain.handle('audio:chunk', async (_e, { buffer }) => {
+  // Renderer captured a WAV audio chunk for transcription.
+  // channel: 'you' (microphone) or 'them' (system/meeting audio loopback).
+  ipcMain.handle('audio:chunk', async (_e, { buffer, channel }) => {
     if (!transcription.isAvailable()) {
       return { ok: false, reason: transcription.unavailableReason() };
     }
+    const ch = channel === 'them' ? 'them' : 'you';
     try {
       const wav = Buffer.from(buffer);
       const text = await transcription.transcribeWav(wav, config);
-      if (text) {
-        transcriptBuffer = `${transcriptBuffer} ${text}`.trim().slice(-6000);
-        send('transcript:update', { text, full: transcriptBuffer });
-      }
+      if (text) addTranscriptTurn(ch, text);
       return { ok: true, text };
     } catch (err) {
       return { ok: false, reason: err.message };
@@ -219,7 +235,7 @@ function registerIpc() {
   });
 
   ipcMain.handle('context:reset', () => {
-    transcriptBuffer = '';
+    transcript = [];
     lastScreenshot = null;
     return { ok: true };
   });
@@ -257,7 +273,34 @@ function persistBounds() {
   }, 400);
 }
 
+// Grant the media permissions the renderer needs for mic + loopback capture,
+// so getUserMedia / getDisplayMedia succeed under our own Screen-Recording grant.
+function setupMediaSession() {
+  const s = session.defaultSession;
+  const allow = (p) =>
+    p === 'media' || p === 'microphone' || p === 'audioCapture' || p === 'display-capture';
+  s.setPermissionRequestHandler((_wc, permission, cb) => cb(allow(permission)));
+  s.setPermissionCheckHandler((_wc, permission) => allow(permission));
+
+  // System-audio loopback: hand getDisplayMedia a screen source with 'loopback'
+  // audio so the renderer can capture what's playing (Zoom/Meet/etc.) WITHOUT
+  // a virtual audio device like BlackHole. macOS 13+ / Electron on darwin.
+  s.setDisplayMediaRequestHandler(
+    (_request, callback) => {
+      desktopCapturer
+        .getSources({ types: ['screen'] })
+        .then((sources) => {
+          if (sources.length) callback({ video: sources[0], audio: 'loopback' });
+          else callback();
+        })
+        .catch(() => callback());
+    },
+    { useSystemPicker: false }
+  );
+}
+
 app.whenReady().then(async () => {
+  setupMediaSession();
   win = createOverlayWindow(config);
 
   // Restore last window position/size if we saved one.

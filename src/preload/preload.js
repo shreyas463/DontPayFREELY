@@ -13,7 +13,7 @@ const api = {
   saveConfig: (partial) => ipcRenderer.invoke('app:saveConfig', partial),
   ask: (prompt, includeScreenshot) =>
     ipcRenderer.invoke('assistant:ask', { prompt, includeScreenshot }),
-  sendAudioChunk: (buffer) => ipcRenderer.invoke('audio:chunk', { buffer }),
+  sendAudioChunk: (buffer, channel) => ipcRenderer.invoke('audio:chunk', { buffer, channel }),
   resetContext: () => ipcRenderer.invoke('context:reset'),
   setSize: (width, height) => ipcRenderer.invoke('window:setSize', { width, height }),
   setClickThrough: (value) => ipcRenderer.invoke('window:setClickThrough', { value }),
