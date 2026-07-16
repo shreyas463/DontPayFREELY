@@ -18,6 +18,7 @@ const { createTray } = require('./tray');
 const permissions = require('./permissions');
 const ai = require('./ai');
 const transcription = require('./transcription');
+const { MODES } = require('./prompts');
 
 let win = null;
 let trayCtl = null;
@@ -75,16 +76,17 @@ function ensureVisible() {
   if (win && !win.isVisible()) win.showInactive();
 }
 
-async function askScreenshot() {
-  ensureVisible();
-  send('assistant:thinking', { reason: 'Analyzing your screen…' });
-  try {
-    const imageDataUrl = await captureScreen();
-    send('context:screenshot', { imageDataUrl });
-    await runCompletion({ imageDataUrl, prompt: '' });
-  } catch (err) {
-    send('assistant:error', { message: err.message });
-  }
+function askScreenshot() {
+  // "Ask about screen" = the Assist mode (screen + recent transcript).
+  runFeature('assist', '');
+}
+
+function solveScreen() {
+  runFeature('solve', '');
+}
+
+function sayNext() {
+  runFeature('say', '');
 }
 
 function quickAsk() {
@@ -165,6 +167,41 @@ async function runCompletion({ imageDataUrl, prompt, system }) {
   }
 }
 
+// Runs a named meeting/interview mode (assist, say, followup, recap, solve, ask).
+let featureBusy = false;
+async function runFeature(mode, userText) {
+  const def = MODES[mode];
+  if (!def || featureBusy) return;
+  featureBusy = true;
+  ensureVisible();
+
+  // Tell the renderer which user bubble (if any) to show for this mode.
+  const bubble = def.userBubble === null ? userText || '' : def.userBubble;
+  send('feature:start', { mode, userBubble: bubble, small: !!def.small });
+
+  try {
+    let imageDataUrl = null;
+    if (def.needsScreen) {
+      send('assistant:thinking', { reason: 'Looking at your screen…' });
+      try {
+        imageDataUrl = await captureScreen();
+        send('context:screenshot', { imageDataUrl });
+      } catch (err) {
+        send('status', {
+          message: 'Screen capture needs permission — grant Screen Recording in System Settings.',
+        });
+      }
+    } else {
+      send('assistant:thinking', { reason: 'Thinking…' });
+    }
+
+    const prompt = def.build({ transcript: formatTranscript(16), userText: userText || '' });
+    await runCompletion({ imageDataUrl, prompt, system: def.system });
+  } finally {
+    featureBusy = false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // IPC from the renderer
 // ---------------------------------------------------------------------------
@@ -202,8 +239,10 @@ function registerIpc() {
     return config;
   });
 
-  // Text prompt typed into the overlay.
+  // Text prompt typed into the overlay — grounded via the Ask mode
+  // (transcript context + our system prompt), screenshot optional.
   ipcMain.handle('assistant:ask', async (_e, { prompt, includeScreenshot }) => {
+    ensureVisible();
     let imageDataUrl = null;
     if (includeScreenshot) {
       try {
@@ -213,7 +252,15 @@ function registerIpc() {
         send('assistant:error', { message: `Screenshot failed: ${err.message}` });
       }
     }
-    await runCompletion({ prompt, imageDataUrl });
+    const def = MODES.ask;
+    const built = def.build({ transcript: formatTranscript(16), userText: prompt });
+    await runCompletion({ prompt: built, system: def.system, imageDataUrl });
+    return { ok: true };
+  });
+
+  // Run a named mode (assist / say / followup / recap / solve) from a UI button.
+  ipcMain.handle('assistant:runMode', async (_e, { mode, text }) => {
+    await runFeature(mode, text);
     return { ok: true };
   });
 
@@ -341,6 +388,8 @@ app.whenReady().then(async () => {
   registerShortcuts(win, config, {
     toggleVisibility,
     askScreenshot,
+    solveScreen,
+    sayNext,
     quickAsk,
     toggleListening,
     toggleClickThrough,

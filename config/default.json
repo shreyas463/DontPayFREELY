@@ -24,6 +24,8 @@
   "shortcuts": {
     "toggleVisibility": "CommandOrControl+\\",
     "askScreenshot": "CommandOrControl+Enter",
+    "solveScreen": "CommandOrControl+Shift+Return",
+    "sayNext": "CommandOrControl+Shift+S",
     "quickAsk": "CommandOrControl+Shift+Space",
     "toggleListening": "CommandOrControl+Shift+L",
     "toggleClickThrough": "CommandOrControl+Shift+M",

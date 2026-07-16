@@ -27,6 +27,8 @@ function registerShortcuts(win, config, handlers) {
 
   bind(sc.toggleVisibility, () => handlers.toggleVisibility());
   bind(sc.askScreenshot, () => handlers.askScreenshot());
+  bind(sc.solveScreen, () => handlers.solveScreen && handlers.solveScreen());
+  bind(sc.sayNext, () => handlers.sayNext && handlers.sayNext());
   bind(sc.quickAsk, () => handlers.quickAsk());
   bind(sc.toggleListening, () => handlers.toggleListening());
   bind(sc.toggleClickThrough, () => handlers.toggleClickThrough());

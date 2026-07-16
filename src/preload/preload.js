@@ -13,6 +13,7 @@ const api = {
   saveConfig: (partial) => ipcRenderer.invoke('app:saveConfig', partial),
   ask: (prompt, includeScreenshot) =>
     ipcRenderer.invoke('assistant:ask', { prompt, includeScreenshot }),
+  runMode: (mode, text) => ipcRenderer.invoke('assistant:runMode', { mode, text }),
   sendAudioChunk: (buffer, channel) => ipcRenderer.invoke('audio:chunk', { buffer, channel }),
   resetContext: () => ipcRenderer.invoke('context:reset'),
   setSize: (width, height) => ipcRenderer.invoke('window:setSize', { width, height }),
@@ -41,6 +42,8 @@ const api = {
       'ui:click-through',
       'settings:open',
       'permissions:update',
+      'feature:start',
+      'status',
     ]);
     if (!allowed.has(channel)) return () => {};
     const listener = (_e, payload) => handler(payload);
