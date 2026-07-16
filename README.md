@@ -1,112 +1,185 @@
-# FreelyCluely
+<div align="center">
 
-An open-source, stealth AI overlay assistant for macOS — a working replica of [Cluely](https://cluely.com).
+# 👻 FreelyCluely
 
-It floats a **transparent, always-on-top window** that is **invisible to screen sharing and recording**, watches your screen (screenshots), listens to your audio (local transcription), and feeds that context to an LLM to give you real-time answers — all driven by global hotkeys.
+### *Don't pay. Be freely Cluely.*
 
-> Built as a technical/educational project. Use it responsibly and only where you're permitted to.
+An open-source, **stealth AI overlay** for macOS that watches your screen, hears your calls,
+and streams you the answer — all from a window that's **invisible to screen sharing**. 🫥
+
+A fully-working, self-hostable replica of [Cluely](https://cluely.com) — minus the subscription.
+
+<br/>
+
+![macOS](https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=apple&logoColor=white)
+![Electron](https://img.shields.io/badge/Electron-2C2E3B?style=for-the-badge&logo=electron&logoColor=9FEAF9)
+![Whisper](https://img.shields.io/badge/Whisper-local-58e6c8?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-7c8cff?style=for-the-badge)
+
+<br/>
+
+`⌘\` to toggle · `⌘↵` to ask about your screen · `⌘⇧L` to start listening
+
+</div>
 
 ---
 
-## What works
+## 🪄 What is this?
 
-- **Stealth overlay** — frameless, translucent, always-on-top, follows you across spaces, excluded from screen capture via Electron `setContentProtection`.
-- **Menu-bar control** — a tray icon (the Dock icon is hidden) to show/hide, ask, listen, toggle click-through, open settings, and quit.
-- **Screenshot understanding** — captures the primary display and sends it to a vision model.
-- **Live transcription** — microphone audio → 16 kHz WAV chunks → **local Whisper** (whisper.cpp), no cloud. Pick any input device (route a loopback device for system audio).
-- **Real-time answers** — streaming responses, **Markdown-rendered** (code blocks, lists, bold), with one-click copy.
-- **Global hotkeys** — toggle, ask, listen, move, click-through, clear, quit.
-- **Click-through mode** — let mouse events pass through the overlay.
-- **In-app settings** — switch AI provider/model, Whisper model, input device, chunk length, and opacity without touching JSON.
-- **Permission handling** — detects missing Screen Recording / Microphone access and deep-links you to the right macOS pane.
-- **Window memory** — remembers its last position and size.
-- **Pluggable AI** — ships with a zero-config **mock** provider; drop in **Claude**, **OpenAI**, or **Gemini** by picking it in settings + adding an API key.
+You're on a call. A tricky question lands. Somewhere off to the side — where **no screen recording, no Zoom share, no OBS capture can see it** — a little glass panel quietly types out the perfect answer.
 
-## Quick start
+That's FreelyCluely. It runs entirely on your machine, transcribes with **local Whisper** (nothing leaves your laptop until *you* pick a cloud LLM), and stays out of the way until you tap a hotkey.
 
-```bash
-npm install          # installs Electron (+ tries nodejs-whisper)
-npm start            # launches the overlay
+> [!NOTE]
+> Built as a technical & educational project — the fun part is the stealth-overlay + real-time-context engineering. Use it responsibly, honestly, and only where you're actually allowed to. 💛
+
+---
+
+## ✨ Features
+
+| | |
+|---|---|
+| 🫥 **Invisible overlay** | Frameless, translucent, always-on-top, follows you across Spaces — and excluded from screen capture via `setContentProtection`. |
+| 📸 **Sees your screen** | One hotkey grabs the display and pipes it to a vision model. |
+| 🎙️ **Hears your calls** | Mic audio → 16 kHz chunks → **local Whisper** (whisper.cpp). No cloud, no leaks. |
+| ⚡ **Real-time answers** | Streamed token-by-token, **Markdown-rendered** (code blocks, lists, the works) with one-click copy. |
+| 🎛️ **Menu-bar native** | No Dock icon. A tray menu drives everything — show/hide, ask, listen, quit. |
+| ⌨️ **All hotkeys** | Toggle, ask, listen, move, click-through, clear — every one remappable. |
+| 🖱️ **Click-through mode** | Let your clicks pass *through* the overlay to whatever's behind it. |
+| 🔌 **Bring your own brain** | Ships with a zero-config **mock** provider. Drop in **Claude**, **GPT-4o**, or **Gemini** whenever. |
+| 🧠 **Remembers itself** | Window position, size, and your settings persist between launches. |
+
+---
+
+## 🧬 How it works
+
+```mermaid
+flowchart LR
+    S["🖥️ Screen"] -->|screenshot| CTX["🧠 Context"]
+    A["🎙️ Audio"] -->|local Whisper| CTX
+    CTX --> LLM["✨ LLM"]
+    LLM -->|streaming markdown| UI["👻 Invisible overlay"]
+    K["⌨️ Hotkeys"] -.trigger.-> UI
+
+    subgraph OnDevice["🔒 100% on your machine"]
+        S
+        A
+        CTX
+    end
 ```
 
-On first launch you get the stealth overlay with the **mock** AI provider — the entire pipeline (overlay, screenshots, hotkeys, transcription) works with **no API keys**.
+Everything left of the LLM box runs **100% on-device**. The only thing that ever touches the network is the answer request — and only once you plug in an API key.
 
-### Enable local transcription
+---
+
+## 🚀 Quick start
 
 ```bash
-npm run whisper:setup    # installs/builds whisper.cpp + downloads a model (needs cmake + Xcode CLT)
+npm install      # Electron (+ tries to grab nodejs-whisper)
+npm start        # 👻 the overlay floats up
 ```
 
-### Enable a real LLM
+That's it. On first launch the **entire pipeline works with zero API keys** — overlay, screenshots, hotkeys, and transcription all run against the built-in **mock** provider so you can feel the whole thing before committing to anything.
 
-1. `cp .env.example .env` and add the key for your provider.
-2. Set the provider in `config/default.json` (or `~/.freelycluely/config.json`):
+<details>
+<summary><b>🗣️ Turn on real transcription</b></summary>
+
+```bash
+npm run whisper:setup   # builds whisper.cpp + downloads a model (needs cmake + Xcode CLT)
+```
+</details>
+
+<details>
+<summary><b>🧠 Plug in a real LLM</b></summary>
+
+1. `cp .env.example .env` and paste in your key.
+2. Open **⚙️ Settings** in the app and pick your provider — `anthropic`, `openai`, or `gemini` — or set it in config:
    ```json
    { "ai": { "provider": "anthropic" } }
    ```
-   Options: `anthropic`, `openai`, `gemini`.
-3. Restart.
+3. Restart. Done. ✅
+</details>
 
-## Default hotkeys
+---
 
-| Action | Shortcut |
-|---|---|
-| Show / hide overlay | ⌘ \ |
-| Ask about screen (screenshot) | ⌘ Enter |
-| Quick ask (focus input) | ⌘ ⇧ Space |
-| Toggle listening | ⌘ ⇧ L |
-| Toggle click-through | ⌘ ⇧ M |
-| Clear context | ⌘ ⇧ K |
-| Move overlay | ⌘ + arrows |
-| Quit | ⌘ ⇧ Q |
+## ⌨️ Hotkeys
 
-All remappable in the config file.
+| Action | Keys |
+|---|:---:|
+| 👁️ Show / hide overlay | `⌘` `\` |
+| 📸 Ask about screen | `⌘` `↵` |
+| 💬 Quick ask (focus input) | `⌘` `⇧` `Space` |
+| 🎙️ Toggle listening | `⌘` `⇧` `L` |
+| 🖱️ Toggle click-through | `⌘` `⇧` `M` |
+| 🧹 Clear context | `⌘` `⇧` `K` |
+| ↔️ Move overlay | `⌘` `+` arrows |
+| 🛑 Quit | `⌘` `⇧` `Q` |
 
-## macOS permissions
+*Every binding is remappable in the config file (or `~/.freelycluely/config.json`).*
 
-- **Screen Recording** — required for screenshots (System Settings → Privacy & Security → Screen Recording → enable your terminal/Electron).
-- **Microphone** — required for transcription.
+---
 
-## Architecture
+## 🔐 macOS permissions
+
+The app checks these for you and deep-links you straight to the right pane if anything's missing:
+
+- **Screen Recording** → so it can screenshot (Privacy & Security → Screen Recording).
+- **Microphone** → so it can hear and transcribe.
+
+---
+
+## 🗂️ Architecture
 
 ```
 src/
-├── main/                 # Electron main process
-│   ├── main.js           # lifecycle, IPC, orchestration
-│   ├── window.js         # stealth overlay window (content protection, always-on-top)
-│   ├── tray.js           # menu-bar icon + context menu
-│   ├── permissions.js    # macOS screen/mic permission checks + deep links
-│   ├── shortcuts.js      # global hotkeys
-│   ├── screenshot.js     # desktopCapturer screen capture
-│   ├── transcription.js  # local Whisper (whisper.cpp) wrapper
-│   ├── config.js         # layered config (defaults + user overrides)
-│   └── ai/
-│       ├── index.js      # provider abstraction + graceful fallback
-│       └── providers/    # mock, anthropic, openai, gemini
-├── preload/preload.js    # safe IPC bridge (contextIsolation)
-└── renderer/             # overlay UI (HTML/CSS/JS)
-    ├── renderer.js       # UI logic, audio capture + WAV encoding
-    └── markdown.js       # tiny XSS-safe Markdown renderer
+├── main/                 # ⚙️ Electron main process
+│   ├── main.js           #    lifecycle, IPC, orchestration
+│   ├── window.js         #    the stealth overlay window
+│   ├── tray.js           #    menu-bar icon + context menu
+│   ├── permissions.js    #    macOS screen/mic checks + deep links
+│   ├── shortcuts.js      #    global hotkeys
+│   ├── screenshot.js     #    desktopCapturer screen grab
+│   ├── transcription.js  #    local Whisper wrapper
+│   ├── config.js         #    layered config (defaults + overrides)
+│   └── ai/               #    🔌 provider abstraction
+│       └── providers/    #       mock · anthropic · openai · gemini
+├── preload/preload.js    # 🔒 safe IPC bridge (contextIsolation)
+└── renderer/             # 🎨 overlay UI
+    ├── renderer.js       #    UI logic, audio capture + WAV encoding
+    └── markdown.js       #    tiny XSS-safe Markdown renderer
 
-assets/                   # generated app + tray icons (npm run icons)
-build/                    # electron-builder entitlements
-scripts/                  # icon generator, whisper setup
+assets/   🎨 icons generated from code (npm run icons)
+build/    📦 electron-builder entitlements
+scripts/  🛠️ icon generator + whisper setup
 ```
 
-## Packaging a distributable
+---
+
+## 📦 Ship it
 
 ```bash
-npm run icons            # regenerate icons from code
-npm run dist             # build a signed-ish .dmg + .zip into dist/ (macOS)
-npm run dist:dir         # unpacked .app for quick local testing
+npm run dist        # 🍏 build a .dmg + .zip into dist/ (universal macOS)
+npm run dist:dir    # unpacked .app for a quick local test
+npm run icons       # regenerate the app + tray icons from code
 ```
 
-`electron-builder` is configured in `package.json` (`build`): universal mac targets, hardened-runtime entitlements in `build/entitlements.mac.plist`, `LSUIElement` so it runs as a menu-bar accessory, and the mic/screen usage strings macOS requires.
+Packaging is wired up in `package.json`: universal mac targets, hardened-runtime entitlements, `LSUIElement` accessory mode (menu-bar only), and the mic/screen usage strings macOS demands.
 
-### Notes on system audio
+> [!TIP]
+> **Capturing the *other* side of a call?** macOS won't hand you system audio directly. Route it through a loopback device like [BlackHole](https://github.com/ExistentialAudio/BlackHole), then pick it as your input in **⚙️ Settings**. Your mic works out of the box.
 
-Microphone capture works out of the box. Capturing **system/output audio** (the other side of a call) on macOS requires a loopback device such as [BlackHole](https://github.com/ExistentialAudio/BlackHole) or ScreenCaptureKit; route it to an input and select it as the mic. This is a macOS limitation, not an app one.
+---
 
-## License
+## 🛠️ Tech stack
 
-MIT
+**Electron** · **Node.js** · **whisper.cpp** (local STT) · **Claude / GPT-4o / Gemini** (pluggable vision LLMs) · a hand-rolled **XSS-safe Markdown renderer** · zero UI frameworks — just clean HTML/CSS/JS.
+
+---
+
+<div align="center">
+
+**MIT Licensed** — do whatever, just be cool about it. 💛
+
+*Made for the curious. Powered by good hotkeys.*
+
+</div>
