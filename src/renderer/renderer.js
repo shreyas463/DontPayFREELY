@@ -232,8 +232,8 @@ cluely.on('ui:focus-input', () => {
 // "ghost" mode where even the controls are click-through.
 // ---------------------------------------------------------------------------
 const INTERACTIVE_SEL =
-  '#drag-bar, .modes, .composer, .transcript-strip, .drawer, .perm-banner, .toast, ' +
-  '.bubble, .role, .error-msg, .empty, .mode-btn, .icon-btn, .tool-btn, .send-btn, .copy-btn';
+  '#drag-bar, .modes, .composer, .transcript-strip, .drawer, .onboard-scrim, .perm-banner, ' +
+  '.toast, .bubble, .role, .error-msg, .empty, .mode-btn, .icon-btn, .tool-btn, .send-btn, .copy-btn';
 let ignoringMouse = null;
 
 function requestIgnore(v) {
@@ -789,6 +789,133 @@ cluely.on('permissions:update', (perm) => {
   updatePermissionBanner(perm);
 });
 
+// ---------------------------------------------------------------------------
+// First-run onboarding
+// ---------------------------------------------------------------------------
+const ob = {
+  scrim: document.getElementById('onboard-scrim'),
+  icon: document.getElementById('ob-icon'),
+  title: document.getElementById('ob-title'),
+  body: document.getElementById('ob-body'),
+  actions: document.getElementById('ob-actions'),
+  dots: document.getElementById('ob-dots'),
+  back: document.getElementById('ob-back'),
+  next: document.getElementById('ob-next'),
+  skip: document.getElementById('ob-skip'),
+};
+
+const OB_STEPS = [
+  {
+    icon: '👋',
+    title: 'Welcome to FreelyCluely',
+    body:
+      'A private AI copilot that floats over your screen. It can <strong>see your screen</strong>, ' +
+      '<strong>hear your calls</strong>, and hand you an answer — while staying hidden from most ' +
+      'screen shares. Everything runs on your machine until you plug in a cloud AI key.<br><br>' +
+      'This takes about a minute.',
+  },
+  {
+    icon: '🔐',
+    title: 'Grant two permissions',
+    body:
+      'macOS needs your OK for FreelyCluely to see and hear. Click each button, flip ' +
+      '<strong>FreelyCluely</strong> on, then come back.<ul>' +
+      '<li><strong>Screen Recording</strong> — screenshots + meeting audio</li>' +
+      '<li><strong>Microphone</strong> — to hear you</li></ul>',
+    actions: [
+      { label: 'Screen Recording…', run: () => cluely.openPermSettings('screen') },
+      { label: 'Microphone…', run: () => cluely.openPermSettings('microphone') },
+    ],
+  },
+  {
+    icon: '🔑',
+    title: 'Bring your own AI',
+    body:
+      'FreelyCluely works out of the box with a built-in <span class="hl">mock</span> brain — no key ' +
+      'needed to try it. For real answers, add your own <span class="hl">Claude</span>, ' +
+      '<span class="hl">OpenAI</span>, or <span class="hl">Gemini</span> key to a <code>.env</code> ' +
+      'file and pick the provider in Settings.',
+    actions: [{ label: 'Open Settings', run: () => { finishOnboarding(); openDrawer(); } }],
+  },
+  {
+    icon: '🫥',
+    title: 'Stay invisible on calls',
+    body:
+      'The overlay is hidden from most screen shares automatically — Google Meet, Teams, and ' +
+      'QuickTime need nothing. <strong>Zoom is the exception:</strong> turn on its ' +
+      '<span class="hl">advanced screen-capture with window filtering</span> mode ' +
+      '(Zoom → Settings → Share Screen → Advanced), or Zoom may reveal the overlay to viewers.',
+  },
+  {
+    icon: '✨',
+    title: "You're set",
+    body:
+      'Quick start:<ul>' +
+      '<li><strong>Assist</strong> — read the screen + conversation and answer</li>' +
+      '<li><strong>Say</strong> — get the next line to say out loud</li>' +
+      '<li><strong>🎙 Listen</strong> — transcribe you + the other person</li>' +
+      '<li>Type a question and press Enter</li></ul>' +
+      'Reopen this guide anytime by clicking the <strong>FreelyCluely</strong> name up top.',
+  },
+];
+
+let obIndex = 0;
+
+function renderOnboard() {
+  const step = OB_STEPS[obIndex];
+  ob.icon.textContent = step.icon;
+  ob.title.textContent = step.title;
+  ob.body.innerHTML = step.body;
+  ob.actions.innerHTML = '';
+  (step.actions || []).forEach((a) => {
+    const b = document.createElement('button');
+    b.textContent = a.label;
+    b.addEventListener('click', a.run);
+    ob.actions.appendChild(b);
+  });
+  ob.dots.innerHTML = '';
+  OB_STEPS.forEach((_, i) => {
+    const d = document.createElement('span');
+    if (i === obIndex) d.className = 'on';
+    ob.dots.appendChild(d);
+  });
+  ob.back.style.visibility = obIndex === 0 ? 'hidden' : 'visible';
+  ob.skip.style.visibility = obIndex === OB_STEPS.length - 1 ? 'hidden' : 'visible';
+  ob.next.textContent = obIndex === OB_STEPS.length - 1 ? 'Done' : 'Next';
+}
+
+function showOnboarding() {
+  obIndex = 0;
+  renderOnboard();
+  ob.scrim.classList.remove('hidden');
+}
+
+async function finishOnboarding() {
+  ob.scrim.classList.add('hidden');
+  await cluely.saveConfig({ onboarded: true });
+}
+
+function openDrawer() {
+  el.drawer.classList.remove('hidden');
+  renderSettings();
+}
+
+ob.next.addEventListener('click', () => {
+  if (obIndex === OB_STEPS.length - 1) finishOnboarding();
+  else {
+    obIndex += 1;
+    renderOnboard();
+  }
+});
+ob.back.addEventListener('click', () => {
+  if (obIndex > 0) {
+    obIndex -= 1;
+    renderOnboard();
+  }
+});
+ob.skip.addEventListener('click', finishOnboarding);
+document.querySelector('.brand-name').addEventListener('click', showOnboarding);
+
 async function init() {
   const s = await cluely.getStatus();
   state.status = s;
@@ -808,6 +935,10 @@ async function init() {
 
   updatePermissionBanner(s.permissions);
   setListeningUI(false);
+
+  // First run: walk the user through permissions, keys, and stealth setup.
+  const cfg = await cluely.getConfig();
+  if (!cfg.onboarded) showOnboarding();
 }
 
 init();

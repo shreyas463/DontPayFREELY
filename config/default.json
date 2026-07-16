@@ -1,4 +1,5 @@
 {
+  "onboarded": false,
   "ai": {
     "provider": "mock",
     "model": "",
