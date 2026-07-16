@@ -225,6 +225,29 @@ cluely.on('ui:click-through', (p) => {
   document.body.style.opacity = p.clickThrough ? '0.75' : '1';
 });
 
+// A mode was triggered (button or hotkey): show its user bubble, if any.
+cluely.on('feature:start', (p) => {
+  if (p && p.userBubble) addUserMessage(p.userBubble);
+});
+
+// Transient status/notice from main (e.g. permission hints).
+let statusTimer = null;
+cluely.on('status', (p) => {
+  const msg = p && p.message;
+  if (!msg) return;
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast';
+    toast.className = 'toast';
+    document.getElementById('app').appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => toast.classList.remove('show'), 9000);
+});
+
 // ---------------------------------------------------------------------------
 // Transcript
 // ---------------------------------------------------------------------------
@@ -506,6 +529,11 @@ el.listen.addEventListener('click', () => {
   setListeningUI(next);
   if (next) startAudioCapture();
   else stopAudioCapture();
+});
+
+// Quick action modes (assist / say / followup / recap / solve)
+document.querySelectorAll('.mode-btn').forEach((btn) => {
+  btn.addEventListener('click', () => cluely.runMode(btn.dataset.mode, ''));
 });
 
 el.hideBtn.addEventListener('click', () => window.blur());
