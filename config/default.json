@@ -1,0 +1,37 @@
+{
+  "ai": {
+    "provider": "mock",
+    "model": "",
+    "maxTokens": 1024,
+    "systemPrompt": "You are a discreet, real-time AI assistant embedded in an invisible desktop overlay. The user is in a live conversation, interview, or meeting. Given the current screen contents and/or a live transcript of what is being said, produce the single most useful thing the user needs RIGHT NOW: a direct answer, a concise talking point, or the next thing to say. Be fast, specific, and confident. Prefer short, skimmable output (a sentence or a few bullets). Do not add disclaimers or restate the question."
+  },
+  "transcription": {
+    "provider": "whisper-local",
+    "model": "base.en",
+    "chunkSeconds": 6,
+    "language": "en",
+    "audioDeviceId": ""
+  },
+  "overlay": {
+    "width": 480,
+    "height": 560,
+    "opacity": 0.96,
+    "startVisible": true,
+    "clickThrough": false,
+    "position": "top-right",
+    "contentProtection": true
+  },
+  "shortcuts": {
+    "toggleVisibility": "CommandOrControl+\\",
+    "askScreenshot": "CommandOrControl+Enter",
+    "quickAsk": "CommandOrControl+Shift+Space",
+    "toggleListening": "CommandOrControl+Shift+L",
+    "toggleClickThrough": "CommandOrControl+Shift+M",
+    "clearContext": "CommandOrControl+Shift+K",
+    "moveUp": "CommandOrControl+Up",
+    "moveDown": "CommandOrControl+Down",
+    "moveLeft": "CommandOrControl+Left",
+    "moveRight": "CommandOrControl+Right",
+    "quit": "CommandOrControl+Shift+Q"
+  }
+}
