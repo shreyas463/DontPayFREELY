@@ -39,14 +39,17 @@ That's FreelyCluely. It runs entirely on your machine, transcribes with **local 
 
 | | |
 |---|---|
-| 🫥 **Invisible overlay** | Frameless, translucent, always-on-top, follows you across Spaces — and excluded from screen capture via `setContentProtection`. |
+| 🫥 **Invisible overlay** | Frameless, translucent, always-on-top, follows you across Spaces, hidden from Mission Control — and excluded from screen capture via `setContentProtection`. |
 | 📸 **Sees your screen** | One hotkey grabs the display and pipes it to a vision model. |
-| 🎙️ **Hears your calls** | Mic audio → 16 kHz chunks → **local Whisper** (whisper.cpp). No cloud, no leaks. |
+| 🎙️ **Hears *both* sides** | Your mic **and** the meeting's system audio — captured natively through the app's own Screen-Recording grant, **no BlackHole required**. |
+| 🗣️ **Knows who's talking** | Dual-channel transcript labels your mic as **You** and system audio as **Them**, so the model has real conversational context. |
+| 🎯 **Meeting modes** | One tap for **Assist**, **What to say**, **Follow-ups**, **Recap**, or a dedicated **Solve** (coding) — each with its own tuned prompt. |
 | ⚡ **Real-time answers** | Streamed token-by-token, **Markdown-rendered** (code blocks, lists, the works) with one-click copy. |
 | 🎛️ **Menu-bar native** | No Dock icon. A tray menu drives everything — show/hide, ask, listen, quit. |
-| ⌨️ **All hotkeys** | Toggle, ask, listen, move, click-through, clear — every one remappable. |
-| 🖱️ **Click-through mode** | Let your clicks pass *through* the overlay to whatever's behind it. |
+| 🖱️ **Ghost click-through** | Empty overlay areas pass clicks *through* to the app behind; controls stay live. Hotkey forces full pass-through. |
+| 🧭 **Guided first run** | An onboarding walkthrough wires up permissions, your AI key, and the Zoom stealth setting. |
 | 🔌 **Bring your own brain** | Ships with a zero-config **mock** provider. Drop in **Claude**, **GPT-4o**, or **Gemini** whenever. |
+| 🎙️ **Local transcription** | Audio → 16 kHz chunks → **local Whisper** (whisper.cpp). Nothing leaves your machine. |
 | 🧠 **Remembers itself** | Window position, size, and your settings persist between launches. |
 
 ---
@@ -56,14 +59,16 @@ That's FreelyCluely. It runs entirely on your machine, transcribes with **local 
 ```mermaid
 flowchart LR
     S["🖥️ Screen"] -->|screenshot| CTX["🧠 Context"]
-    A["🎙️ Audio"] -->|local Whisper| CTX
+    MIC["🎙️ You (mic)"] -->|local Whisper| CTX
+    SYS["🔊 Them (system audio)"] -->|local Whisper| CTX
     CTX --> LLM["✨ LLM"]
     LLM -->|streaming markdown| UI["👻 Invisible overlay"]
-    K["⌨️ Hotkeys"] -.trigger.-> UI
+    K["⌨️ Hotkeys / modes"] -.trigger.-> UI
 
     subgraph OnDevice["🔒 100% on your machine"]
         S
-        A
+        MIC
+        SYS
         CTX
     end
 ```
@@ -107,10 +112,12 @@ npm run whisper:setup   # builds whisper.cpp + downloads a model (needs cmake + 
 | Action | Keys |
 |---|:---:|
 | 👁️ Show / hide overlay | `⌘` `\` |
-| 📸 Ask about screen | `⌘` `↵` |
+| ✨ Assist (screen + convo) | `⌘` `↵` |
+| ◇ Solve what's on screen | `⌘` `⇧` `↵` |
+| 💬 What should I say | `⌘` `⇧` `S` |
 | 💬 Quick ask (focus input) | `⌘` `⇧` `Space` |
 | 🎙️ Toggle listening | `⌘` `⇧` `L` |
-| 🖱️ Toggle click-through | `⌘` `⇧` `M` |
+| 🖱️ Ghost click-through | `⌘` `⇧` `M` |
 | 🧹 Clear context | `⌘` `⇧` `K` |
 | ↔️ Move overlay | `⌘` `+` arrows |
 | 🛑 Quit | `⌘` `⇧` `Q` |
@@ -140,12 +147,13 @@ src/
 │   ├── shortcuts.js      #    global hotkeys
 │   ├── screenshot.js     #    desktopCapturer screen grab
 │   ├── transcription.js  #    local Whisper wrapper
+│   ├── prompts.js        #    meeting/interview mode prompts
 │   ├── config.js         #    layered config (defaults + overrides)
 │   └── ai/               #    🔌 provider abstraction
 │       └── providers/    #       mock · anthropic · openai · gemini
 ├── preload/preload.js    # 🔒 safe IPC bridge (contextIsolation)
 └── renderer/             # 🎨 overlay UI
-    ├── renderer.js       #    UI logic, audio capture + WAV encoding
+    ├── renderer.js       #    UI logic, dual-channel audio + WAV encoding
     └── markdown.js       #    tiny XSS-safe Markdown renderer
 
 assets/   🎨 icons generated from code (npm run icons)
@@ -166,13 +174,13 @@ npm run icons       # regenerate the app + tray icons from code
 Packaging is wired up in `package.json`: universal mac targets, hardened-runtime entitlements, `LSUIElement` accessory mode (menu-bar only), and the mic/screen usage strings macOS demands.
 
 > [!TIP]
-> **Capturing the *other* side of a call?** macOS won't hand you system audio directly. Route it through a loopback device like [BlackHole](https://github.com/ExistentialAudio/BlackHole), then pick it as your input in **⚙️ Settings**. Your mic works out of the box.
+> **Capturing the *other* side of a call?** It just works — system audio is captured natively through the app's own Screen-Recording grant (Electron loopback), so **no BlackHole or virtual audio device needed**. Grant Screen Recording, hit 🎙 Listen, and you'll see a **system** chip light up. (Needs macOS 13+; toggle listening from the mic button so the capture keeps its user-gesture.)
 
 ---
 
 ## 🛠️ Tech stack
 
-**Electron** · **Node.js** · **whisper.cpp** (local STT) · **Claude / GPT-4o / Gemini** (pluggable vision LLMs) · a hand-rolled **XSS-safe Markdown renderer** · zero UI frameworks — just clean HTML/CSS/JS.
+**Electron** (loopback system-audio capture) · **Node.js** · **whisper.cpp** (local STT) · **Claude / GPT-4o / Gemini** (pluggable vision LLMs) · a hand-rolled **XSS-safe Markdown renderer** · zero UI frameworks — just clean HTML/CSS/JS.
 
 ---
 
