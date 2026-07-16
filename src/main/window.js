@@ -57,6 +57,11 @@ function createOverlayWindow(config) {
   // Follow the user across desktops / spaces, and show over full-screen apps.
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
+  // Keep it out of Mission Control / the app switcher — one less place it shows.
+  if (typeof win.setHiddenInMissionControl === 'function') {
+    win.setHiddenInMissionControl(true);
+  }
+
   // The stealth feature: exclude this window from screen capture & sharing.
   if (overlay.contentProtection !== false) {
     win.setContentProtection(true);
