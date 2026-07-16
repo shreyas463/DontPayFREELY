@@ -579,4 +579,12 @@ body {
   padding: 1px 5px;
 }
 
+/* ---------- Dual-channel transcript + system-audio chip ---------- */
+.transcript-label.them { color: var(--accent-2); }
+#chip-sys.on {
+  color: var(--accent-2);
+  border-color: rgba(88, 230, 200, 0.4);
+  background: rgba(88, 230, 200, 0.1);
+}
+
 .hidden { display: none !important; }

@@ -21,6 +21,7 @@
         <div class="bar-status" id="status-chips">
           <span class="chip" id="chip-ai" title="AI provider">mock</span>
           <span class="chip" id="chip-listen" title="Listening state">idle</span>
+          <span class="chip hidden" id="chip-sys" title="Capturing system audio">system</span>
         </div>
         <div class="bar-actions no-drag">
           <button class="icon-btn" id="btn-settings" title="Settings">⚙</button>
@@ -47,7 +48,7 @@
 
       <!-- Live transcript strip -->
       <div class="transcript-strip hidden" id="transcript-strip">
-        <span class="transcript-label">live</span>
+        <span class="transcript-label" id="transcript-label">live</span>
         <span class="transcript-text" id="transcript-text"></span>
       </div>
 

@@ -16,7 +16,9 @@ const el = {
   liveDot: document.getElementById('live-dot'),
   chipAi: document.getElementById('chip-ai'),
   chipListen: document.getElementById('chip-listen'),
+  chipSys: document.getElementById('chip-sys'),
   transcriptStrip: document.getElementById('transcript-strip'),
+  transcriptLabel: document.getElementById('transcript-label'),
   transcriptText: document.getElementById('transcript-text'),
   settingsBtn: document.getElementById('btn-settings'),
   hideBtn: document.getElementById('btn-hide'),
@@ -226,18 +228,22 @@ cluely.on('ui:click-through', (p) => {
 // ---------------------------------------------------------------------------
 // Transcript
 // ---------------------------------------------------------------------------
-function setTranscript(text) {
+function setTranscript(text, who) {
   if (!text) {
     el.transcriptStrip.classList.add('hidden');
     el.transcriptText.textContent = '';
     return;
   }
   el.transcriptStrip.classList.remove('hidden');
+  if (who && el.transcriptLabel) {
+    el.transcriptLabel.textContent = who === 'them' ? 'them' : 'you';
+    el.transcriptLabel.classList.toggle('them', who === 'them');
+  }
   el.transcriptText.textContent = text;
 }
 
 cluely.on('transcript:update', (p) => {
-  setTranscript(p.full || p.text);
+  setTranscript(p.text, p.channel);
 });
 
 cluely.on('listening:state', (p) => {
@@ -247,18 +253,116 @@ cluely.on('listening:state', (p) => {
 });
 
 // ---------------------------------------------------------------------------
-// Audio capture (microphone) -> 16 kHz mono WAV chunks -> main -> Whisper
+// Audio capture -> 16 kHz mono WAV chunks -> main -> Whisper
+//
+// Two independent pipelines run at once:
+//   'you'  = your microphone (getUserMedia)
+//   'them' = system / meeting audio (getDisplayMedia loopback — no BlackHole)
+// Each is transcribed separately so the model knows who is speaking.
 // ---------------------------------------------------------------------------
-let audioCtx = null;
-let mediaStream = null;
-let sourceNode = null;
-let processorNode = null;
-let pcmChunks = [];
-let sampleRate = 16000;
-let chunkTimer = null;
+function createCapture(channel) {
+  let ctx = null;
+  let stream = null;
+  let source = null;
+  let proc = null;
+  let chunks = [];
+  let rate = 16000;
+  let timer = null;
+
+  async function start(getStream) {
+    if (stream) return { ok: true };
+    let s;
+    try {
+      s = await getStream();
+    } catch (err) {
+      return { ok: false, error: err && err.message ? err.message : String(err) };
+    }
+    if (!s) return { ok: false, error: 'no stream' };
+    const tracks = s.getAudioTracks();
+    if (!tracks.length) {
+      s.getTracks().forEach((t) => t.stop());
+      return { ok: false, error: 'no audio track' };
+    }
+    stream = s;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    rate = ctx.sampleRate;
+    source = ctx.createMediaStreamSource(new MediaStream(tracks));
+    proc = ctx.createScriptProcessor(4096, 1, 1);
+    const sink = ctx.createGain();
+    sink.gain.value = 0; // run the processor without echoing audio back out
+    proc.onaudioprocess = (e) => chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+    source.connect(proc);
+    proc.connect(sink);
+    sink.connect(ctx.destination);
+    const secs = (state.status && state.status.transcriptionChunk) || 6;
+    timer = setInterval(flush, secs * 1000);
+    return { ok: true };
+  }
+
+  async function flush() {
+    if (!chunks.length) return;
+    const merged = mergeFloat32(chunks);
+    chunks = [];
+    if (rms(merged) < 0.006) return; // skip near-silent chunks
+    const wav = encodeWav(downsampleTo16k(merged, rate), 16000);
+    const res = await cluely.sendAudioChunk(new Uint8Array(wav), channel);
+    if (res && !res.ok && res.reason) {
+      addError(res.reason);
+      stopListening();
+    }
+  }
+
+  function stop() {
+    if (timer) clearInterval(timer);
+    timer = null;
+    if (proc) {
+      proc.disconnect();
+      proc.onaudioprocess = null;
+      proc = null;
+    }
+    if (source) {
+      source.disconnect();
+      source = null;
+    }
+    if (ctx) {
+      ctx.close();
+      ctx = null;
+    }
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
+      stream = null;
+    }
+    chunks = [];
+  }
+
+  return {
+    start,
+    stop,
+    get active() {
+      return !!stream;
+    },
+  };
+}
+
+const micCapture = createCapture('you');
+const sysCapture = createCapture('them');
 
 async function startAudioCapture() {
-  if (mediaStream) return;
+  // Kick off system/loopback capture FIRST (without awaiting) so getDisplayMedia
+  // still holds the click's user activation. Failure here is non-fatal — the mic
+  // path below is what matters, and system audio only works when the app has the
+  // Screen-Recording grant and was toggled from a click (not a bare hotkey).
+  if (state.captureSystemAudio !== false) {
+    sysCapture
+      .start(async () => {
+        const s = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        s.getVideoTracks().forEach((t) => t.stop()); // audio only
+        return s;
+      })
+      .then((res) => setSystemAudioUI(res.ok))
+      .catch(() => setSystemAudioUI(false));
+  }
+
   const deviceId = (state.status && state.status.audioDeviceId) || '';
   const audioConstraints = {
     channelCount: 1,
@@ -267,58 +371,31 @@ async function startAudioCapture() {
     autoGainControl: true,
   };
   if (deviceId) audioConstraints.deviceId = { exact: deviceId };
-  try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
-  } catch (err) {
-    addError(`Microphone access failed: ${err.message}`);
-    setListeningUI(false);
-    return;
+  const micRes = await micCapture.start(() =>
+    navigator.mediaDevices.getUserMedia({ audio: audioConstraints })
+  );
+  if (!micRes.ok) {
+    addError(`Microphone access failed: ${micRes.error}`);
+    stopListening();
   }
-
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  sampleRate = audioCtx.sampleRate;
-  sourceNode = audioCtx.createMediaStreamSource(mediaStream);
-  processorNode = audioCtx.createScriptProcessor(4096, 1, 1);
-
-  processorNode.onaudioprocess = (e) => {
-    const input = e.inputBuffer.getChannelData(0);
-    pcmChunks.push(new Float32Array(input));
-  };
-
-  sourceNode.connect(processorNode);
-  processorNode.connect(audioCtx.destination);
-
-  const chunkSeconds = (state.status?.transcriptionChunk) || 6;
-  chunkTimer = setInterval(() => flushAudioChunk(), chunkSeconds * 1000);
 }
 
 function stopAudioCapture() {
-  if (chunkTimer) clearInterval(chunkTimer);
-  chunkTimer = null;
-  if (processorNode) processorNode.disconnect();
-  if (sourceNode) sourceNode.disconnect();
-  if (audioCtx) audioCtx.close();
-  if (mediaStream) mediaStream.getTracks().forEach((t) => t.stop());
-  processorNode = sourceNode = audioCtx = mediaStream = null;
-  pcmChunks = [];
+  micCapture.stop();
+  sysCapture.stop();
+  setSystemAudioUI(false);
 }
 
-async function flushAudioChunk() {
-  if (!pcmChunks.length) return;
-  const merged = mergeFloat32(pcmChunks);
-  pcmChunks = [];
+function stopListening() {
+  setListeningUI(false);
+  stopAudioCapture();
+}
 
-  // Skip near-silent chunks to avoid wasting Whisper cycles.
-  if (rms(merged) < 0.006) return;
-
-  const down = downsampleTo16k(merged, sampleRate);
-  const wav = encodeWav(down, 16000);
-  const bytes = new Uint8Array(wav);
-  const res = await cluely.sendAudioChunk(bytes);
-  if (res && !res.ok && res.reason) {
-    addError(res.reason);
-    setListeningUI(false);
-    stopAudioCapture();
+function setSystemAudioUI(on) {
+  state.systemAudio = on;
+  if (el.chipSys) {
+    el.chipSys.classList.toggle('hidden', !on);
+    el.chipSys.classList.toggle('on', on);
   }
 }
 
