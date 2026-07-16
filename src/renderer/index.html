@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self';"
+    />
+    <title>FreelyCluely</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app" class="panel">
+      <!-- Drag handle / top bar -->
+      <header class="bar" id="drag-bar">
+        <div class="brand">
+          <span class="dot" id="live-dot"></span>
+          <span class="brand-name">Freely<span class="accent">Cluely</span></span>
+        </div>
+        <div class="bar-status" id="status-chips">
+          <span class="chip" id="chip-ai" title="AI provider">mock</span>
+          <span class="chip" id="chip-listen" title="Listening state">idle</span>
+        </div>
+        <div class="bar-actions no-drag">
+          <button class="icon-btn" id="btn-settings" title="Settings">⚙</button>
+          <button class="icon-btn" id="btn-hide" title="Hide (toggle hotkey)">▾</button>
+        </div>
+      </header>
+
+      <!-- Permission banner -->
+      <div class="perm-banner hidden" id="perm-banner">
+        <span class="perm-text" id="perm-text"></span>
+        <button class="perm-btn" id="perm-fix">Open Settings</button>
+      </div>
+
+      <!-- Answer / conversation area -->
+      <main class="stream" id="stream">
+        <div class="empty" id="empty-state">
+          <div class="empty-title">Ready.</div>
+          <div class="empty-sub">
+            Ask a question, or press the screenshot hotkey to analyze your screen.
+          </div>
+          <ul class="hint-list" id="hint-list"></ul>
+        </div>
+      </main>
+
+      <!-- Live transcript strip -->
+      <div class="transcript-strip hidden" id="transcript-strip">
+        <span class="transcript-label">live</span>
+        <span class="transcript-text" id="transcript-text"></span>
+      </div>
+
+      <!-- Input -->
+      <footer class="composer no-drag">
+        <button class="tool-btn" id="btn-shot" title="Attach screenshot with next question">◱</button>
+        <button class="tool-btn" id="btn-listen" title="Toggle listening">🎙</button>
+        <textarea
+          id="input"
+          class="input"
+          rows="1"
+          placeholder="Ask anything…  (Enter to send)"
+        ></textarea>
+        <button class="send-btn" id="btn-send" title="Send">➤</button>
+      </footer>
+
+      <!-- Settings drawer -->
+      <section class="drawer hidden" id="drawer">
+        <div class="drawer-head">
+          <span>Settings</span>
+          <button class="icon-btn" id="btn-close-drawer">✕</button>
+        </div>
+        <div class="drawer-body" id="drawer-body"></div>
+      </section>
+    </div>
+
+    <script src="markdown.js"></script>
+    <script src="renderer.js"></script>
+  </body>
+</html>
